@@ -1,3 +1,4 @@
 *.wav
 jumpcutter/
-
+.gitignore
+.DS_Store
