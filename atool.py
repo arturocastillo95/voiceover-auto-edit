@@ -5,6 +5,10 @@ import numpy as np
 import sys
 import os
 from shutil import rmtree, copyfile
+import subprocess
+
+pygame.init()
+pygame.font.init()
 
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
@@ -14,6 +18,47 @@ RATE = 44100
 KEEP_THRESHOLD = 0.013 # a chunk will only t labeled as "having content" if the absolute value of the min or max exceeds this threshold.
 KEEP_MARGIN = 4 # number of chunks around a "content-filled chunk" to be kept!
 EDGE_MARGIN = 3 # this many chunks at the start or end of a chunk will NOT be included (to avoid the sound of the space bar being pressed, etc.)
+
+#Pygame variables
+size = width, height = 1280, 720
+white = 255, 255, 255
+
+def render_text_cenered_at(text, font, colour, x, y, screen, allowed_width):
+    # first, split the text into words
+    words = text.split()
+
+    # now, construct lines out of these words
+    lines = []
+    while len(words) > 0:
+        # get as many words as will fit within allowed_width
+        line_words = []
+        while len(words) > 0:
+            line_words.append(words.pop(0))
+            fw, fh = font.size(' '.join(line_words + words[:1]))
+            if fw > allowed_width:
+                break
+
+        # add a line consisting of those words
+        line = ' '.join(line_words)
+        lines.append(line)
+
+    # now we've split our text into lines that fit into the width, actually
+    # render them
+
+    # we'll render each line below the last, so we need to keep track of
+    # the culmative height of the lines we've rendered so far
+    y_offset = 0
+    for line in lines:
+        fw, fh = font.size(line)
+
+        # (tx, ty) is the top-left of the font surface
+        tx = x - fw / 2
+        ty = y + y_offset
+
+        font_surface = font.render(line, True, colour)
+        screen.blit(font_surface, (tx, ty))
+
+        y_offset += fh
 
 def createPath(s):
     try:  
@@ -38,8 +83,8 @@ def get_min_max(arr):
         keep = 1
     return np.array([[minv, maxv, keep]])
 
-def write_file(frames, session):
-    wf = wave.open('test1.wav', 'wb')
+def write_file(output_file, frames, session):
+    wf = wave.open(output_file, 'wb')
     wf.setnchannels(CHANNELS)
     wf.setsampwidth(session.get_sample_size(FORMAT))
     wf.setframerate(RATE)
@@ -60,26 +105,40 @@ def trim_audio(frames, keep_data):
 
     return frames_with_content
 
+def stitch_files(save_file, last_visited_line):
+    f = open('TEMP/file_list.txt', 'w+')
+    for i in range(0, last_visited_line+1):
+        f.write('file ' + str(i) + '.wav\n')
+    f.flush()
+    f.close()
+    command = 'ffmpeg -f concat -safe 0 -i TEMP/file_list.txt -c copy ' + save_file
+    subprocess.call(command, shell=True)
 
-def stop_recording(stream, session, frames, keep_data):
+    deletePath('TEMP')
+        
+
+def stop_recording(save_file, last_visited_line, stream, session):
+    global frames
+    global keep_data
+    global pointer
 
     frames = trim_audio(frames, keep_data)
+    output_file = 'TEMP/' + str(pointer) + '.wav'
+    write_file(output_file, frames, session)
 
-    write_file(frames, session)
+    stitch_files(save_file, last_visited_line)
 
     stream.stop_stream()
     stream.close()
     session.terminate()
     sys.exit()
 
-def next_line():
-    print('NEXT')
-
-def main():
-    size = width, height = 1280, 720
-    white = 255, 255, 255
-
-    screen = pygame.display.set_mode(size)
+def start_recording():
+    global pointer
+    global stream
+    global p
+    global frames
+    global keep_data
 
     #Initialize pyaudio and stream
     p = pyaudio.PyAudio()
@@ -95,22 +154,74 @@ def main():
     frames = []
     keep_data = np.zeros((0,3))
 
+def reset_recording():
+    global frames
+    global keep_data
+
+    frames = []
+    keep_data = np.zeros((0,3))
+    print('Reset current line')
+
+def next_line(session):
+    global frames
+    global keep_data
+    global pointer
+
+    frames = trim_audio(frames, keep_data)
+    output_file = 'TEMP/' + str(pointer) + '.wav'
+    write_file(output_file, frames, session)
+
+    pointer += 1
+    frames = []
+    keep_data = np.zeros((0,3))
+
+
+def main():
+    global pointer
+    global stream
+    global p
+    global frames
+    global keep_data
+
+    FONT = pygame.font.SysFont('Helvetica', 35)
+
+    screen = pygame.display.set_mode(size)
+
+    file = sys.argv[1]
+    SAVE_FILE = sys.argv[2]
+    txt = open(file, 'r')
+    txt = txt.read()
+    lines = txt.split('.')
+
+    pointer = 0
+
+    createPath('TEMP')
+
+    start_recording()
+
     while 1:
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
             if event.type == pygame.KEYDOWN:
-                stop_recording(stream, p, frames, keep_data)
+                if event.key == pygame.K_SPACE:
+                    stop_recording(SAVE_FILE, pointer, stream, p)
+                if event.key == pygame.K_LEFT:
+                    reset_recording()
+                if event.key == pygame.K_RIGHT:
+                    next_line(p)
 
         screen.fill(white)
+
+        render_text_cenered_at(lines[pointer], FONT, (0,0,0), 640, 360-35, screen, 1200)
+
         pygame.display.flip()
+
         data = stream.read(CHUNK)
 
         #Decide If audio haves content and if we keep it
         np_data = np.frombuffer(data, dtype=np.int16)
         current_chunk = get_min_max(np_data)
-
-        print(current_chunk)
 
         keep_data = np.concatenate([keep_data, current_chunk])
 
