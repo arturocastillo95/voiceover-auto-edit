@@ -187,9 +187,9 @@ def main():
 
     screen = pygame.display.set_mode(size)
 
-    file = sys.argv[1]
+    TEXT_FILE = sys.argv[1]
     SAVE_FILE = sys.argv[2]
-    txt = open(file, 'r')
+    txt = open(TEXT_FILE, 'r')
     txt = txt.read()
     lines = txt.split('.')
 
