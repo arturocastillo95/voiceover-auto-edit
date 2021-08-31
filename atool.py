@@ -4,8 +4,10 @@ import wave
 import numpy as np
 import sys
 import os
-from shutil import rmtree, copyfile
+from shutil import rmtree
 import subprocess
+import unicodedata as uc
+import re
 
 pygame.init()
 pygame.font.init()
@@ -22,6 +24,24 @@ EDGE_MARGIN = 3 # this many chunks at the start or end of a chunk will NOT be in
 #Pygame variables
 size = width, height = 1280, 720
 white = 255, 255, 255
+
+#Read the txt file
+# file = open(sys.argv[1], 'r')
+# new_file = sys.argv[2]
+# txt = file.read()
+
+# script = uc.normalize('NFKD', txt)
+# script = script.replace('\n', '')
+# script = script.replace("\'", '')
+# script = re.sub(' +', ' ', script)
+
+# phrases = script.split('.')
+
+# with open(new_file, 'w') as outuput:
+#   for phrase in phrases:
+#       if phrase[0] == ' ':
+#         phrase = phrase[1:]
+#       outuput.write(phrase + '\n')
 
 def render_text_cenered_at(text, font, colour, x, y, screen, allowed_width):
     # first, split the text into words
@@ -184,6 +204,8 @@ def main():
     global keep_data
 
     FONT = pygame.font.SysFont('Helvetica', 35)
+    SMALL_FONT = pygame.font.SysFont('Helvetica', 15)
+    
 
     screen = pygame.display.set_mode(size)
 
@@ -211,13 +233,14 @@ def main():
                 if event.key == pygame.K_RIGHT:
                     next_line(p)
 
+        data = stream.read(CHUNK)
+
         screen.fill(white)
 
         render_text_cenered_at(lines[pointer], FONT, (0,0,0), 640, 360-35, screen, 1200)
+        render_text_cenered_at('Reocoring line ' + str(pointer+1) + '/' + str(len(lines)), SMALL_FONT, (0,0,0), 640, 20, screen ,1200)
 
         pygame.display.flip()
-
-        data = stream.read(CHUNK)
 
         #Decide If audio haves content and if we keep it
         np_data = np.frombuffer(data, dtype=np.int16)
