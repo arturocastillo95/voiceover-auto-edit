@@ -1,0 +1,3 @@
+numpy @ file:///Users/runner/miniforge3/conda-bld/numpy_1629092090317/work
+PyAudio==0.2.11
+pygame @ git+https://github.com/pygame/pygame.git@6e09e3f4dd249dd12cbcdf3ae131bc4d161dad55
