@@ -6,8 +6,15 @@ import sys
 import os
 from shutil import rmtree
 import subprocess
+import argparse
 import unicodedata as uc
 import re
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--script', metavar='script', type=str, help='Location of your script in txt format')
+parser.add_argument('--output', metavar='output', type=str, help='Location where you want to the output the final file')
+parser.add_argument('-f', action='store_true')
+parser.add_argument('--text-divider', type=str)
 
 pygame.init()
 pygame.font.init()
@@ -25,23 +32,19 @@ EDGE_MARGIN = 3 # this many chunks at the start or end of a chunk will NOT be in
 size = width, height = 1280, 720
 white = 255, 255, 255
 
-#Read the txt file
-# file = open(sys.argv[1], 'r')
-# new_file = sys.argv[2]
-# txt = file.read()
+# def normalize_text(string):
+#     script = uc.normalize('NFKD', string)
+#     script = script.replace('\n', '')
+#     script = script.replace("\'", '')
+#     script = re.sub(' +', ' ', script)
 
-# script = uc.normalize('NFKD', txt)
-# script = script.replace('\n', '')
-# script = script.replace("\'", '')
-# script = re.sub(' +', ' ', script)
+#     phrases = script.split('.')
 
-# phrases = script.split('.')
-
-# with open(new_file, 'w') as outuput:
-#   for phrase in phrases:
-#       if phrase[0] == ' ':
-#         phrase = phrase[1:]
-#       outuput.write(phrase + '\n')
+#     with open(new_file, 'w') as outuput:
+#     for phrase in phrases:
+#         if phrase[0] == ' ':
+#             phrase = phrase[1:]
+#         outuput.write(phrase + '\n')
 
 def render_text_cenered_at(text, font, colour, x, y, screen, allowed_width):
     # first, split the text into words
@@ -195,6 +198,16 @@ def next_line(session):
     frames = []
     keep_data = np.zeros((0,3))
 
+def previous_line():
+    global frames
+    global keep_data
+    global pointer
+
+    if pointer > 0:
+        pointer += -1
+        frames = []
+        keep_data = np.zeros((0,3))
+
 
 def main():
     global pointer
@@ -203,17 +216,17 @@ def main():
     global frames
     global keep_data
 
+    args = parser.parse_args()
     FONT = pygame.font.SysFont('Helvetica', 35)
     SMALL_FONT = pygame.font.SysFont('Helvetica', 15)
     
-
     screen = pygame.display.set_mode(size)
 
-    TEXT_FILE = sys.argv[1]
-    SAVE_FILE = sys.argv[2]
+    TEXT_FILE = args.script
+    SAVE_FILE = args.output
     txt = open(TEXT_FILE, 'r')
     txt = txt.read()
-    lines = txt.split('.')
+    lines = txt.split('\n')
 
     pointer = 0
 
@@ -229,9 +242,11 @@ def main():
                 if event.key == pygame.K_SPACE:
                     stop_recording(SAVE_FILE, pointer, stream, p)
                 if event.key == pygame.K_LEFT:
-                    reset_recording()
+                    previous_line()
                 if event.key == pygame.K_RIGHT:
                     next_line(p)
+                if event.key == pygame.K_DOWN:
+                    reset_recording()
 
         data = stream.read(CHUNK)
 
